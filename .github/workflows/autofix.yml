@@ -1,0 +1,84 @@
+name: Auto Fix Files
+on: [push, workflow_dispatch]
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Move and Create Files
+        run: |
+          mkdir -p app/src/main/java/com/acrux/ai
+          mkdir -p app
+          
+          # Move existing wrong folders if they exist
+          if [ -d "acrux/ai" ]; then mv acrux/ai/* app/src/main/java/com/acrux/ai/ || true; fi
+          if [ -f "MainActivity.kt" ]; then mv MainActivity.kt app/src/main/java/com/acrux/ai/ || true; fi
+          if [ -f "WakeWordService.kt" ]; then mv WakeWordService.kt app/src/main/java/com/acrux/ai/ || true; fi
+          if [ -f "AcruxTTS.kt" ]; then mv AcruxTTS.kt app/src/main/java/com/acrux/ai/ || true; fi
+          
+          # Create app/build.gradle if missing
+          if [ ! -f "app/build.gradle" ]; then
+            echo "plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+android {
+    namespace 'com.acrux.ai'
+    compileSdk 35
+    defaultConfig {
+        applicationId \"com.acrux.ai\"
+        minSdk 21
+        targetSdk 35
+        versionCode 1
+        versionName \"1.0\"
+    }
+    buildFeatures { compose true }
+    composeOptions { kotlinCompilerExtensionVersion '1.5.14' }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.activity:activity-compose:1.9.0'
+    implementation 'androidx.compose.material3:material3:1.2.1'
+    implementation 'androidx.compose.ui:ui:1.6.7'
+    implementation 'androidx.compose.ui:ui-tooling-preview:1.6.7'
+    implementation 'ai.picovoice:porcupine-android:3.0.2'
+}" > app/build.gradle
+          fi
+          
+          # Create AndroidManifest.xml if missing
+          if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
+            echo '<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">
+    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />
+    <uses-permission android:name=\"android.permission.INTERNET\" />
+    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />
+    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />
+    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MICROPHONE\" />
+    <application android:label=\"ACRUX AI\" android:theme=\"@style/Theme.Material3.Dark\">
+        <activity android:name=\".MainActivity\" android:exported=\"true\">
+            <intent-filter>
+                <action android:name=\"android.intent.action.MAIN\" />
+                <category android:name=\"android.intent.category.LAUNCHER\" />
+            </intent-filter>
+        </activity>
+        <service android:name=\".WakeWordService\" android:exported=\"false\" android:foregroundServiceType=\"microphone\" />
+    </application>
+</manifest>' > app/src/main/AndroidManifest.xml
+          fi
+          
+          # Clean up empty folders
+          rmdir acrux/ai acrux 2>/dev/null || true
+          
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name 'Auto Fix'
+          git config --global user.email 'autofix@example.com'
+          git add .
+          git commit -m "Auto-fix project structure and missing files" || echo "No changes to commit"
+          git push
